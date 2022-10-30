@@ -13,5 +13,7 @@ UCLASS()
 class ZOMBIELAND_API AZombieLandGameModeBase : public AGameModeBase
 {
 	GENERATED_BODY()
-	
+
+public:
+	AZombieLandGameModeBase();
 };
