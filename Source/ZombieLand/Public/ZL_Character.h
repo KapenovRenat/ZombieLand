@@ -4,6 +4,8 @@
 
 #include "CoreMinimal.h"
 #include "Camera/CameraComponent.h"
+#include "Components/TextRenderComponent.h"
+#include "Components/ZL_HealthtComponent.h"
 #include "GameFramework/Character.h"
 #include "ZL_Character.generated.h"
 
@@ -28,6 +30,12 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float RotateSpeedInterp = 1.0f;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category="Components")
+	UZL_HealthtComponent* HealthComponent;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category="Components")
+	UTextRenderComponent* HealthTextComponent;
+
 	UFUNCTION(BlueprintCallable, Category="Movement")
 	float GetMovementDirection() const;
 
@@ -46,5 +54,5 @@ public:
 	void MoveRight(float AxisValue);
 	void LookUp(float AxisValue);
 	void TurnArround(float AxisValue);
-	void RotateForMouse(float deltaTime);
+	void RotateForMouse(float DeltaTime);
 };

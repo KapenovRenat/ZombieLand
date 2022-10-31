@@ -5,7 +5,6 @@
 #include "GameFramework/SpringArmComponent.h"
 #include "Kismet/KismetMathLibrary.h"
 #include "Kismet/KismetSystemLibrary.h"
-
 // Sets default values
 AZL_Character::AZL_Character()
 {
@@ -25,6 +24,10 @@ AZL_Character::AZL_Character()
 	SpringArmComp->bUsePawnControlRotation = false;
 	SpringArmComp->bEnableCameraLag = false;
 	SpringArmComp->TargetArmLength = 500.0f;
+
+	HealthComponent = CreateDefaultSubobject<UZL_HealthtComponent>("HealthComponent");
+	HealthTextComponent = CreateDefaultSubobject<UTextRenderComponent>("HealthTextComponent");
+	HealthTextComponent->SetupAttachment(GetRootComponent());
 }
 
 float AZL_Character::GetMovementDirection() const
@@ -40,14 +43,34 @@ float AZL_Character::GetMovementDirection() const
 void AZL_Character::BeginPlay()
 {
 	Super::BeginPlay();
-	
+
+	APlayerController* PC = Cast<APlayerController>(GetController());
+
+	if (PC)
+	{
+		PC->bShowMouseCursor = true; 
+		PC->bEnableClickEvents = false; 
+		PC->bEnableMouseOverEvents = false;
+	}
+
+	check(HealthComponent);
+	check(HealthTextComponent);
 }
 
 // Called every frame
 void AZL_Character::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+	//
+	
+	const auto Health = HealthComponent->GetHealth();
+	HealthTextComponent->SetText(FText::FromString(FString::Printf(TEXT("%.0f"), Health)));
+	FVector MainCameraLocation = MainCamera->GetComponentLocation();
+	FRotator RotatorHealthText = UKismetMathLibrary::FindLookAtRotation(HealthTextComponent->GetComponentLocation(), MainCameraLocation);
+	HealthTextComponent->SetRelativeRotation(RotatorHealthText);
 
+	TakeDamage(0.1f, FDamageEvent{}, Controller, this);
+	
 	RotateForMouse(DeltaTime);
 }
 
@@ -58,8 +81,8 @@ void AZL_Character::SetupPlayerInputComponent(UInputComponent* PlayerInputCompon
 
 	InputComponent->BindAxis("Move", this, &AZL_Character::MoveForward);
 	InputComponent->BindAxis("MoveRight", this, &AZL_Character::MoveRight);
-	InputComponent->BindAxis("MouseX", this, &AZL_Character::TurnArround);
-	InputComponent->BindAxis("MouseY", this, &AZL_Character::LookUp);
+	// InputComponent->BindAxis("MouseX", this, &AZL_Character::TurnArround);
+	// InputComponent->BindAxis("MouseY", this, &AZL_Character::LookUp);
 	InputComponent->BindAction("Jump", IE_Pressed, this, &AZL_Character::Jump);
 }
 
@@ -83,31 +106,34 @@ void AZL_Character::TurnArround(float AxisValue)
 	AddControllerYawInput(AxisValue);
 }
 
-void AZL_Character::RotateForMouse(float deltaTime)
+void AZL_Character::RotateForMouse(float DeltaTime)
 {
-	FVector MouseLocation, MouseDirection;
-	GetWorld()->GetFirstPlayerController()->DeprojectMousePositionToWorld(MouseLocation, MouseDirection);
-	float ArmLength = SpringArmComp->TargetArmLength + 2000.0f;
-	FVector MultiplayDirectionAndArmLength = MouseDirection * ArmLength;
-	FVector LineTraceEnd = MultiplayDirectionAndArmLength + MouseLocation;
-	FHitResult OutHit;
-	FCollisionQueryParams Params;
-	Params.AddIgnoredActor(this);
 	
-	if (GetWorld()->LineTraceSingleByChannel(OutHit, MouseLocation, LineTraceEnd, ECollisionChannel::ECC_Visibility, Params, FCollisionResponseParams::DefaultResponseParam))
-	{
-		FRotator PlayerRot = UKismetMathLibrary::FindLookAtRotation(GetActorLocation(), OutHit.Location);
-		// FRotator InterpRot = FMath::RInterpTo(GetActorRotation(), PlayerRot, deltaTime, RotateSpeedInterp);
-		FRotator NewPlayerRot = FRotator::ZeroRotator;
-		NewPlayerRot.Roll = GetActorRotation().Roll;
-		NewPlayerRot.Pitch = GetActorRotation().Pitch;
-		NewPlayerRot.Yaw = PlayerRot.Yaw;
+	APlayerController* PC = Cast<APlayerController>(GetController());
 
-		// FString HealthStr = "Yaw = " + FString::SanitizeFloat(InterpRot.Yaw) + " Pitch = " + FString::SanitizeFloat(InterpRot.Pitch) + " Roll = " + FString::SanitizeFloat(InterpRot.Roll);
-		// UKismetSystemLibrary::PrintString(GetWorld(), HealthStr, true, false, FLinearColor::Red, 1.0f);
+	if (PC)
+	{
+		FVector MouseLocation, MouseDirection;
+		PC->DeprojectMousePositionToWorld(MouseLocation, MouseDirection);
+		float ArmLength = SpringArmComp->TargetArmLength + 2000.0f;
+		FVector MultiplayDirectionAndArmLength = MouseDirection * ArmLength;
+		FVector LineTraceEnd = MultiplayDirectionAndArmLength + MouseLocation;
+		FHitResult OutHit;
+		FCollisionQueryParams Params;
+		Params.AddIgnoredActor(this);
+	
+		if (GetWorld()->LineTraceSingleByChannel(OutHit, MouseLocation, LineTraceEnd, ECollisionChannel::ECC_Visibility, Params, FCollisionResponseParams::DefaultResponseParam))
+		{
+			FRotator PlayerRot = UKismetMathLibrary::FindLookAtRotation(GetActorLocation(), OutHit.Location);
+			// FRotator InterpRot = FMath::RInterpConstantTo(GetActorRotation(), PlayerRot, DeltaTime, RotateSpeedInterp);
+			//
+			// FString HealthStr = "Yaw = " + FString::SanitizeFloat(InterpRot.Yaw);
+			// UKismetSystemLibrary::PrintString(GetWorld(), HealthStr, true, false, FLinearColor::Red, 1.0f);
 		
-		SetActorRotation(NewPlayerRot, ETeleportType::None);
-		DrawDebugLine(GetWorld(), MouseLocation, LineTraceEnd, FColor::Red, true, 5.0f, 0, 0.0f);
+			SetActorRotation(FRotator(GetActorRotation().Pitch, PlayerRot.Yaw, GetActorRotation().Roll), ETeleportType::None);
+			DrawDebugLine(GetWorld(), MouseLocation, LineTraceEnd, FColor::Red, true, 5.0f, 0, 0.0f);
+		}
 	}
+	
 }
 
