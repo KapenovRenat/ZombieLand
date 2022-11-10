@@ -2,6 +2,8 @@
 
 
 #include "ZL_Character.h"
+
+#include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Kismet/KismetMathLibrary.h"
 #include "Kismet/KismetSystemLibrary.h"
@@ -55,6 +57,12 @@ void AZL_Character::BeginPlay()
 
 	check(HealthComponent);
 	check(HealthTextComponent);
+	check(GetCharacterMovement());
+	OnHealthChanged(HealthComponent->GetHealth());
+	HealthComponent->OnDeath.AddUObject(this, &AZL_Character::OnDeath);
+	HealthComponent->OnHealthChanged.AddUObject(this, &AZL_Character::OnHealthChanged);
+
+	SpawnWeapon();
 }
 
 // Called every frame
@@ -63,13 +71,9 @@ void AZL_Character::Tick(float DeltaTime)
 	Super::Tick(DeltaTime);
 	//
 	
-	const auto Health = HealthComponent->GetHealth();
-	HealthTextComponent->SetText(FText::FromString(FString::Printf(TEXT("%.0f"), Health)));
 	FVector MainCameraLocation = MainCamera->GetComponentLocation();
 	FRotator RotatorHealthText = UKismetMathLibrary::FindLookAtRotation(HealthTextComponent->GetComponentLocation(), MainCameraLocation);
 	HealthTextComponent->SetRelativeRotation(RotatorHealthText);
-
-	TakeDamage(0.1f, FDamageEvent{}, Controller, this);
 	
 	RotateForMouse(DeltaTime);
 }
@@ -131,9 +135,44 @@ void AZL_Character::RotateForMouse(float DeltaTime)
 			// UKismetSystemLibrary::PrintString(GetWorld(), HealthStr, true, false, FLinearColor::Red, 1.0f);
 		
 			SetActorRotation(FRotator(GetActorRotation().Pitch, PlayerRot.Yaw, GetActorRotation().Roll), ETeleportType::None);
-			DrawDebugLine(GetWorld(), MouseLocation, LineTraceEnd, FColor::Red, true, 5.0f, 0, 0.0f);
+			// DrawDebugLine(GetWorld(), MouseLocation, LineTraceEnd, FColor::Red, true, 5.0f, 0, 0.0f);
 		}
 	}
 	
+}
+
+void AZL_Character::OnDeath()
+{
+	PlayAnimMontage(DeathAnim);
+	GetCharacterMovement()->DisableMovement();
+	SetLifeSpan(5.0f);
+	FString Text ="IsDead + "  + GetName();
+	// 	FString LOGString = "Damage + " + FString::SanitizeFloat(Damage);
+	// UKismetSystemLibrary::PrintString(GetWorld(), *LOGString, true, false, FLinearColor::Red, 1.0f);
+	UKismetSystemLibrary::PrintString(GetWorld(), Text, true, false, FLinearColor::Red, 1.0f);
+
+	if (Controller)
+	{
+		Controller->ChangeState(NAME_Spectating);
+	}
+}
+
+void AZL_Character::OnHealthChanged(float Health)
+{
+	HealthTextComponent->SetText(FText::FromString(FString::Printf(TEXT("%.0f"), Health)));
+}
+
+void AZL_Character::SpawnWeapon()
+{
+
+	if (!GetWorld()) return;
+
+	const auto Weapon = GetWorld()->SpawnActor<AZLWeapon>(WeaponClass);
+
+	if (Weapon)
+	{
+		FAttachmentTransformRules AttachmentRules(EAttachmentRule::SnapToTarget, false);
+		Weapon->AttachToComponent(GetMesh(), AttachmentRules, "WeaponSocket");
+	}
 }
 

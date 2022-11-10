@@ -7,7 +7,10 @@
 #include "Components/TextRenderComponent.h"
 #include "Components/ZL_HealthtComponent.h"
 #include "GameFramework/Character.h"
+#include "Weapon/ZLWeapon.h"
 #include "ZL_Character.generated.h"
+
+class AZLWeapon;
 
 UCLASS()
 class ZOMBIELAND_API AZL_Character : public ACharacter
@@ -39,9 +42,15 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Movement")
 	float GetMovementDirection() const;
 
+	UPROPERTY(EditDefaultsOnly, Category="Weapon")
+	TSubclassOf<AZLWeapon> WeaponClass;
+
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
+
+	UPROPERTY(EditDefaultsOnly, Category="Animation")
+	UAnimMontage* DeathAnim;
 
 public:	
 	// Called every frame
@@ -55,4 +64,7 @@ public:
 	void LookUp(float AxisValue);
 	void TurnArround(float AxisValue);
 	void RotateForMouse(float DeltaTime);
+	void OnDeath();
+	void OnHealthChanged(float Health);
+	void SpawnWeapon();
 };
